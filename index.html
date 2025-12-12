@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mobile Touch Pong</title>
+    <style>
+        body {
+            /* Basic layout for mobile optimization */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: rgb(30, 30, 30); /* Dark Gray */
+            color: rgb(255, 255, 255);
+            font-family: sans-serif;
+            /* Prevents iOS from zooming/scrolling */
+            touch-action: manipulation; 
+        }
+        canvas {
+            /* Set a fixed size that works well on most phones */
+            width: 95vw; /* 95% of viewport width */
+            max-width: 600px; /* Don't get too big on tablets/desktops */
+            height: auto;
+            border: 2px solid rgb(255, 255, 255);
+            /* Background will be drawn via JavaScript for the gradient effect */
+        }
+        h1 { font-size: 1.2em; }
+        p { font-size: 0.9em; }
+    </style>
+</head>
+<body>
+
+    <h1>Mobile Pong: Tap to Move Paddle!</h1>
+    <p>Tap and drag on the left half of the screen to move your paddle.</p>
+    <canvas id="pongGame" width="600" height="400"></canvas>
+
+    <script>
+        // --- 1. SETUP ---
+        const canvas = document.getElementById('pongGame');
+        const ctx = canvas.getContext('2d');
+
+        // Game dimensions
+        const W = canvas.width;
+        const H = canvas.height;
+
+        // Colors using RGB values
+        const BG_COLOR = "rgb(15, 15, 15)";
+        const P1_COLOR = "rgb(0, 200, 255)"; // Cyan/Blue for Player 1
+        const P2_COLOR = "rgb(255, 100, 0)";  // Orange/Red for Player 2 (AI)
+        const BALL_COLOR = "rgb(255, 255, 255)"; // White
+
+        // Player Score
+        let scoreP1 = 0;
+        let scoreP2 = 0; 
+
+        // --- 2. GAME OBJECTS ---
+        const paddleWidth = 10;
+        const paddleHeight = 100;
+        const paddleSpeed = 6; 
+
+        const paddle1 = {
+            x: 10,
+            y: H / 2 - paddleHeight / 2,
+            dy: 0, 
+            color: P1_COLOR
+        };
+
+        const paddle2 = { 
+            x: W - 10 - paddleWidth,
+            y: H / 2 - paddleHeight / 2,
+            color: P2_COLOR
+        };
+
+        const ball = {
+            x: W / 2,
+            y: H / 2,
+            radius: 7,
+            dx: 4, 
+            dy: 4,  
+            color: BALL_COLOR
+        };
+
+        // --- 3. DRAWING FUNCTIONS (Using RGB) ---
+
+        function drawRect(x, y, w, h, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, w, h);
+        }
+
+        function drawCircle(x, y, r, color) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2, false);
+            ctx.closePath();
+            ctx.fill();
+        }
+        
+        function drawScore() {
+            // Draw scores
+            ctx.fillStyle = P1_COLOR;
+            ctx.font = "40px sans-serif";
+            ctx.fillText(scoreP1, W / 4, 50);
+
+            ctx.fillStyle = P2_COLOR;
+            ctx.fillText(scoreP2, 3 * W / 4, 50);
+        }
+
+        function drawBackground() {
+            // Gradient center line for visual pop
+            let gradient = ctx.createLinearGradient(W/2 - 1, 0, W/2 + 1, H);
+            gradient.addColorStop(0, "rgb(50, 50, 50)");
+            gradient.addColorStop(0.5, "rgb(100, 100, 100)");
+            gradient.addColorStop(1, "rgb(50, 50, 50)");
+
+            drawRect(0, 0, W, H, BG_COLOR);
+            drawRect(W / 2 - 1, 0, 2, H, gradient); 
+        }
+
+        // --- 4. GAME LOGIC ---
+
+        function resetBall() {
+            ball.x = W / 2;
+            ball.y = H / 2;
+            ball.dx = -ball.dx; 
+            ball.dy = 4 * (Math.random() > 0.5 ? 1 : -1); 
+        }
+
+        function update() {
+            // Clear the canvas and draw background
+            drawBackground();
+
+            // --- Move Player Paddle 1 ---
+            paddle1.y += paddle1.dy;
+            
+            // Keep paddle within vertical bounds
+            paddle1.y = Math.max(0, Math.min(paddle1.y, H - paddleHeight));
+
+
+            // --- Simple AI Movement (Paddle 2) ---
+            let targetY = ball.y - paddleHeight / 2;
+            let difference = targetY - paddle2.y;
+            paddle2.y += difference * 0.1; 
+
+            // --- Move Ball ---
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // --- Ball Collision with Walls and Paddles (Same logic as before) ---
+            if (ball.y - ball.radius < 0 || ball.y + ball.radius > H) {
+                ball.dy = -ball.dy;
+            }
+            
+            // Check collision for P1
+            if (ball.dx < 0 && ball.x - ball.radius < paddle1.x + paddleWidth &&
+                ball.y + ball.radius > paddle1.y && ball.y - ball.radius < paddle1.y + paddleHeight) {
+                ball.dx = -ball.dx;
+                let collidePoint = (ball.y - (paddle1.y + paddleHeight / 2));
+                ball.dy = collidePoint * 0.3;
+            } 
+            
+            // Check collision for P2
+            else if (ball.dx > 0 && ball.x + ball.radius > paddle2.x &&
+                ball.y + ball.radius > paddle2.y && ball.y - ball.radius < paddle2.y + paddleHeight) {
+                ball.dx = -ball.dx;
+                let collidePoint = (ball.y - (paddle2.y + paddleHeight / 2));
+                ball.dy = collidePoint * 0.3;
+            }
+
+            // --- Scoring ---
+            if (ball.x < 0) {
+                scoreP2++;
+                resetBall();
+            } else if (ball.x > W) {
+                scoreP1++;
+                resetBall();
+            }
+
+            // --- Draw Objects ---
+            drawRect(paddle1.x, paddle1.y, paddleWidth, paddleHeight, paddle1.color);
+            drawRect(paddle2.x, paddle2.y, paddleWidth, paddleHeight, paddle2.color);
+            drawCircle(ball.x, ball.y, ball.radius, ball.color);
+            drawScore();
+        }
+
+        // --- 5. TOUCH INPUT HANDLING (Mobile Optimization) ---
+
+        // Function to handle the touch movement
+        function handleTouchMove(event) {
+            // Prevent default browser actions (like scrolling)
+            event.preventDefault(); 
+            
+            // We only care about the first touch point
+            const touchY = event.touches[0].clientY;
+            
+            // Get canvas position information
+            const rect = canvas.getBoundingClientRect();
+            
+            // Convert touch Y coordinate to canvas Y coordinate
+            // (touchY - rect.top) is the Y position relative to the canvas top
+            const canvasY = touchY - rect.top; 
+
+            // Set the paddle's position to be centered on the touch point
+            let newPaddleY = canvasY - paddleHeight / 2;
+            
+            // Apply the new position directly (instant move)
+            // Use smoothing if you prefer the paddle to lag slightly: paddle1.y += (newPaddleY - paddle1.y) * 0.5;
+            paddle1.y = newPaddleY; 
+        }
+
+        // Add touch listeners
+        canvas.addEventListener('touchmove', handleTouchMove);
+        // We also use 'touchstart' to allow initial positioning without dragging
+        canvas.addEventListener('touchstart', handleTouchMove);
+
+
+        // --- 6. GAME LOOP ---
+        function gameLoop() {
+            update();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game
+        gameLoop();
+    </script>
+</body>
+</html>
